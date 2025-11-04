@@ -1,0 +1,489 @@
+{% extends "base/base.html" %}
+
+{% block title %}Painel Administrativo{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h3 class="text-center titulo">Painel do Administrador</h3>
+
+    <div class="container mt-4">
+        <div class="painel-container">
+            <div class="painel-card">
+                <i class="bi bi-clipboard-check"></i>
+                <h4>{{ resumos.total_chamados }}</h4>
+                <p>Total de Chamados</p>
+            </div>
+            <div class="painel-card">
+                <i class="bi bi-plus-circle"></i>
+                <h4>{{ resumos.chamados_hoje }}</h4>
+                <p>Chamados Novos</p>
+            </div>
+            <div class="painel-card">
+                <i class="bi bi-hourglass-split"></i>
+                <h4>{{ resumos.chamados_pendentes }}</h4>
+                <p>Pendentes</p>
+            </div>
+            <div class="painel-card">
+                <i class="bi bi-arrow-repeat"></i>
+                <h4>{{ resumos.chamados_em_andamento }}</h4>
+                <p>Em Andamento</p>
+            </div>
+            <div class="painel-card">
+                <i class="bi bi-check-circle"></i>
+                <h4>{{ resumos.chamados_concluidos }}</h4>
+                <p>Fechados</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-lg p-4 mb-4">
+        <div class="row">
+             <div class="col-md-12 mb-3">
+                <label class="form-label">Status:</label>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input status-filter" type="checkbox" id="filtroPendente" value="1" checked>
+                    <label class="form-check-label" for="filtroPendente">Pendente</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input status-filter" type="checkbox" id="filtroEmAndamento" value="2" checked>
+                    <label class="form-check-label" for="filtroEmAndamento">Em Andamento</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input status-filter" type="checkbox" id="filtroConcluido" value="3" checked>
+                    <label class="form-check-label" for="filtroConcluido">Concluído</label>
+                </div>
+            </div>
+            <form id="formFiltro">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label class="form-label">Tipo de Data:</label>
+                        <select class="form-select" id="tipoData" name="tipo_data">
+                            <option value="abertura">Data de Abertura</option>
+                            <option value="conclusao">Data de Conclusão</option>
+                        </select>
+                    </div>
+            
+                    <div class="col-md-3">
+                        <label class="form-label">Data Inicial:</label>
+                        <input type="date" class="form-control" id="dataInicio" name="data_inicio">
+                    </div>
+            
+                    <div class="col-md-3">
+                        <label class="form-label">Data Final:</label>
+                        <input type="date" class="form-control" id="dataFim" name="data_fim">
+                    </div>
+            
+                    <div class="col-md-3">
+                        <label class="form-label">Filtrar por Setor:</label>
+                        <select id="filtroSetor" name="setor" class="form-control">
+                            <option value="">Selecione um setor</option>
+                            {% for setor in setores %}
+                                <option value="{{ setor }}">{{ setor }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+            
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="button" class="btn btn-primary w-100" id="btnFiltrar">
+                            <i class="bi bi-filter"></i> Filtrar
+                        </button>                
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-lg p-4 box-painel">
+        <div class="table-responsive mt-3">
+            <table class="table table-striped table-hover">
+                <thead class="table-primary">
+                    <tr>
+                        <th>ID</th>
+                        <th>Requerente</th>
+                        <th>Status</th>
+                        <th>Setor</th>
+                        <th>Descrição</th>
+                        <th onclick="sortTable(5)" style="cursor: pointer;">Data de Abertura</th>
+                        <th onclick="sortTable(6)" style="cursor: pointer;">Data de Conclusão</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaChamados">
+                    {% for chamado in chamados %}
+                        <tr class="chamado-row" data-status="{{ chamado.status }}" ondblclick="window.location.href='/chamado/{{ chamado.id }}'">
+                            <td>{{ chamado.id }}</td>
+                            <td>{{ chamado.nome }}</td>
+                            <td>
+                                {% if chamado.status == 1 %}
+                                    <span class="badge bg-warning">Pendente</span>
+                                {% elif chamado.status == 2 %}
+                                    <span class="badge bg-primary">Em Andamento</span>
+                                {% elif chamado.status == 3 %}
+                                    <span class="badge bg-success">Concluído</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Desconhecido</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ chamado.setor }}</td>
+                            <td>{{ chamado.descricao }}</td>
+                            <td>{{ chamado.data_criacao.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ chamado.data_conclusao.strftime('%d/%m/%Y %H:%M') if chamado.data_conclusao else 'Em aberto' }}</td>
+                            
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+               <div id="paginacao-tabela" class="d-flex justify-content-center mt-3"></div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+class PaginadorTabela {
+    constructor(tabelaId, linhasPorPagina = 10) {
+        this.tbody = document.getElementById(tabelaId);
+        if (!this.tbody) return;
+        
+        this.linhasPorPagina = linhasPorPagina;
+        this.paginaAtual = 1;
+        this.todasLinhas = Array.from(this.tbody.querySelectorAll('tr'));
+        this.init();
+    }
+
+    init() {
+        this.renderizar();
+    }
+
+    getLinhasVisiveis() {
+        // Retorna apenas linhas que não foram filtradas
+        return this.todasLinhas.filter(linha => {
+            return !linha.hasAttribute('data-filtered');
+        });
+    }
+
+    renderizar() {
+        const linhasVisiveis = this.getLinhasVisiveis();
+        const totalPaginas = Math.ceil(linhasVisiveis.length / this.linhasPorPagina);
+        
+        // Ajusta página atual se necessário
+        if (this.paginaAtual > totalPaginas && totalPaginas > 0) {
+            this.paginaAtual = totalPaginas;
+        }
+        if (this.paginaAtual < 1) {
+            this.paginaAtual = 1;
+        }
+
+        // Esconde TODAS as linhas não filtradas
+        linhasVisiveis.forEach(linha => {
+            linha.style.display = 'none';
+        });
+
+        // Mostra apenas as linhas da página atual
+        const inicio = (this.paginaAtual - 1) * this.linhasPorPagina;
+        const fim = inicio + this.linhasPorPagina;
+        
+        linhasVisiveis.slice(inicio, fim).forEach(linha => {
+            linha.style.display = '';
+        });
+
+        this.atualizarBotoesPaginacao(totalPaginas, linhasVisiveis.length);
+    }
+
+    atualizar() {
+        this.paginaAtual = 1;
+        this.renderizar();
+    }
+
+    atualizarBotoesPaginacao(totalPaginas, totalLinhas) {
+        const containerPaginacao = document.getElementById('paginacao-tabela');
+        containerPaginacao.innerHTML = '';
+
+        // Se não há registros
+        if (totalLinhas === 0) {
+            const aviso = document.createElement('div');
+            aviso.className = 'text-muted text-center';
+            aviso.textContent = 'Nenhum registro encontrado';
+            containerPaginacao.appendChild(aviso);
+            return;
+        }
+
+        // Se tem apenas 1 página ou menos
+        if (totalPaginas <= 1) {
+            const info = document.createElement('div');
+            info.className = 'text-muted text-center';
+            info.textContent = `Mostrando ${totalLinhas} registro${totalLinhas !== 1 ? 's' : ''}`;
+            containerPaginacao.appendChild(info);
+            return;
+        }
+
+        // Container dos botões
+        const divBotoes = document.createElement('div');
+        divBotoes.className = 'd-flex align-items-center justify-content-center flex-wrap gap-2 mb-2';
+
+        // Botão Anterior
+        const btnAnterior = document.createElement('button');
+        btnAnterior.innerHTML = '<i class="bi bi-chevron-left"></i>';
+        btnAnterior.className = 'btn btn-outline-primary btn-sm';
+        btnAnterior.disabled = this.paginaAtual === 1;
+        btnAnterior.onclick = () => {
+            if (this.paginaAtual > 1) {
+                this.paginaAtual--;
+                this.renderizar();
+            }
+        };
+        divBotoes.appendChild(btnAnterior);
+
+        // Lógica para mostrar páginas
+        const maxBotoes = 5;
+        let inicio = Math.max(1, this.paginaAtual - Math.floor(maxBotoes / 2));
+        let fim = Math.min(totalPaginas, inicio + maxBotoes - 1);
+        
+        if (fim - inicio < maxBotoes - 1) {
+            inicio = Math.max(1, fim - maxBotoes + 1);
+        }
+
+        // Primeira página se necessário
+        if (inicio > 1) {
+            divBotoes.appendChild(this.criarBotaoPagina(1));
+            
+            if (inicio > 2) {
+                const span = document.createElement('span');
+                span.textContent = '...';
+                span.className = 'px-1 align-self-center';
+                divBotoes.appendChild(span);
+            }
+        }
+
+        // Páginas do meio
+        for (let i = inicio; i <= fim; i++) {
+            divBotoes.appendChild(this.criarBotaoPagina(i));
+        }
+
+        // Última página se necessário
+        if (fim < totalPaginas) {
+            if (fim < totalPaginas - 1) {
+                const span = document.createElement('span');
+                span.textContent = '...';
+                span.className = 'px-1 align-self-center';
+                divBotoes.appendChild(span);
+            }
+            divBotoes.appendChild(this.criarBotaoPagina(totalPaginas));
+        }
+
+        // Botão Próximo
+        const btnProximo = document.createElement('button');
+        btnProximo.innerHTML = '<i class="bi bi-chevron-right"></i>';
+        btnProximo.className = 'btn btn-outline-primary btn-sm';
+        btnProximo.disabled = this.paginaAtual === totalPaginas;
+        btnProximo.onclick = () => {
+            if (this.paginaAtual < totalPaginas) {
+                this.paginaAtual++;
+                this.renderizar();
+            }
+        };
+        divBotoes.appendChild(btnProximo);
+
+        // === Wrapper visual bonito ===
+        const wrapper = document.createElement('div');
+        wrapper.className = `
+            d-flex 
+            flex-column 
+            align-items-center 
+            justify-content-center 
+            mt-3 
+            gap-2
+        `;
+        wrapper.appendChild(divBotoes);
+
+// Texto de info de registros (agora fica sempre abaixo dos botões)
+        const info = document.createElement('div');
+        info.className = 'text-muted small fw-medium text-center border-top pt-2 w-100';
+        const inicioReg = (this.paginaAtual - 1) * this.linhasPorPagina + 1;
+        const fimReg = Math.min(this.paginaAtual * this.linhasPorPagina, totalLinhas);
+        info.textContent = `Exibindo ${inicioReg} a ${fimReg} de ${totalLinhas} registro${totalLinhas !== 1 ? 's' : ''}`;
+
+        // Adiciona info abaixo dos botões
+        wrapper.appendChild(info);
+
+        // Limpa e adiciona ao container
+        containerPaginacao.innerHTML = '';
+        containerPaginacao.appendChild(wrapper);
+
+    }
+
+    criarBotaoPagina(numeroPagina) {
+        const btn = document.createElement('button');
+        btn.textContent = numeroPagina;
+        btn.className = 'btn btn-sm ' + (numeroPagina === this.paginaAtual ? 'btn-primary' : 'btn-outline-primary');
+        btn.disabled = (numeroPagina === this.paginaAtual);
+        btn.onclick = () => {
+            this.paginaAtual = numeroPagina;
+            this.renderizar();
+        };
+        return btn;
+    }
+}
+
+let paginador;
+
+window.addEventListener('DOMContentLoaded', function() {
+    // Inicializa o paginador
+    paginador = new PaginadorTabela('tabelaChamados', 10);
+
+    // Event listener para o botão Filtrar
+    document.getElementById('btnFiltrar').addEventListener('click', function() {
+        aplicarFiltros();
+    });
+
+    // Event listener para checkboxes de status
+    document.querySelectorAll('.status-filter').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            aplicarFiltros();
+        });
+    });
+
+    // Event listener para mudança no tipo de data
+    document.getElementById('tipoData').addEventListener('change', function() {
+        if (document.getElementById('dataInicio').value || document.getElementById('dataFim').value) {
+            aplicarFiltros();
+        }
+    });
+
+    // Event listener para limpar campos de data
+    const dataInputs = ['dataInicio', 'dataFim'];
+    dataInputs.forEach(inputId => {
+        document.getElementById(inputId).addEventListener('change', function() {
+            if (this.value === '') {
+                aplicarFiltros();
+            }
+        });
+    });
+});
+
+function aplicarFiltros() {
+    const statusSelecionados = Array.from(document.querySelectorAll('.status-filter:checked')).map(cb => cb.value);
+    const tipoData = document.getElementById('tipoData').value;
+    const dataInicio = document.getElementById('dataInicio').value;
+    const dataFim = document.getElementById('dataFim').value;
+    const setorSelecionado = document.getElementById('filtroSetor').value;
+
+    let totalFiltrado = 0;
+
+    document.querySelectorAll('#tabelaChamados tr').forEach(linha => {
+        let mostrar = true;
+
+        // 1. Filtro de Status
+        if (statusSelecionados.length > 0) {
+            const statusLinha = linha.getAttribute('data-status');
+            if (!statusSelecionados.includes(statusLinha)) {
+                mostrar = false;
+            }
+        }
+
+        // 2. Filtro de Setor
+        if (mostrar && setorSelecionado) {
+            const setorLinha = linha.children[3] ? linha.children[3].textContent.trim() : '';
+            if (setorLinha !== setorSelecionado) {
+                mostrar = false;
+            }
+        }
+
+        // 3. Filtro de Datas
+        if (mostrar && (dataInicio || dataFim)) {
+            const colunaData = tipoData === 'abertura' ? 5 : 6;
+            const dataTexto = linha.children[colunaData] ? linha.children[colunaData].textContent.trim() : '';
+            
+            if (dataTexto && dataTexto !== 'Em aberto') {
+                const dataLinha = parsearDataBR(dataTexto);
+                
+                if (dataInicio) {
+                    const dtInicio = new Date(dataInicio + 'T00:00:00');
+                    if (dataLinha < dtInicio) {
+                        mostrar = false;
+                    }
+                }
+                
+                if (dataFim) {
+                    const dtFim = new Date(dataFim + 'T23:59:59');
+                    if (dataLinha > dtFim) {
+                        mostrar = false;
+                    }
+                }
+            } else if (dataTexto === 'Em aberto' && tipoData === 'conclusao') {
+                // Se está filtrando por data de conclusão e o chamado está em aberto, não mostrar
+                mostrar = false;
+            }
+        }
+
+        // Aplica o filtro na linha
+        if (mostrar) {
+            linha.removeAttribute('data-filtered');
+            totalFiltrado++;
+        } else {
+            linha.setAttribute('data-filtered', 'true');
+            linha.style.display = 'none';
+        }
+    });
+
+    // Atualiza a paginação
+    if (paginador) {
+        paginador.atualizar();
+    }
+}
+
+function parsearDataBR(dataString) {
+    try {
+        // Formato esperado: "dd/mm/yyyy hh:mm"
+        const partes = dataString.split(' ');
+        const [dia, mes, ano] = partes[0].split('/');
+        const hora = partes[1] || '00:00';
+        
+        return new Date(`${ano}-${mes}-${dia}T${hora}:00`);
+    } catch (e) {
+        console.error('Erro ao parsear data:', dataString, e);
+        return new Date(0);
+    }
+}
+
+// Função de ordenação de tabela
+function sortTable(colunaIndex) {
+    const tbody = document.getElementById('tabelaChamados');
+    const linhas = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Determina a ordem (ascendente ou descendente)
+    const ordemAtual = tbody.dataset.sortOrder || 'asc';
+    const novaOrdem = ordemAtual === 'asc' ? 'desc' : 'asc';
+    tbody.dataset.sortOrder = novaOrdem;
+    tbody.dataset.sortColumn = colunaIndex;
+    
+    // Ordena as linhas
+    linhas.sort((a, b) => {
+        let valorA = a.cells[colunaIndex] ? a.cells[colunaIndex].textContent.trim() : '';
+        let valorB = b.cells[colunaIndex] ? b.cells[colunaIndex].textContent.trim() : '';
+        
+        // Tratamento especial para colunas de data (5 e 6)
+        if (colunaIndex === 5 || colunaIndex === 6) {
+            valorA = valorA === 'Em aberto' ? new Date(0) : parsearDataBR(valorA);
+            valorB = valorB === 'Em aberto' ? new Date(0) : parsearDataBR(valorB);
+            
+            const comparacao = valorA - valorB;
+            return novaOrdem === 'asc' ? comparacao : -comparacao;
+        }
+        
+        // Comparação de texto
+        const comparacao = valorA.localeCompare(valorB, 'pt-BR', { numeric: true });
+        return novaOrdem === 'asc' ? comparacao : -comparacao;
+    });
+    
+    // Reordena as linhas no DOM
+    linhas.forEach(linha => tbody.appendChild(linha));
+    
+    // Atualiza a paginação mantendo os filtros
+    if (paginador) {
+        paginador.renderizar();
+    }
+}
+</script>
+
+
+{% endblock %}
