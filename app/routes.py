@@ -3,6 +3,8 @@
 from flask import Flask, render_template, request, redirect, flash, session, send_file, jsonify
 from app.models import buscar_chamados_ativos, abrir_chamado, excluir_chamado, resumo_chamados, buscar_chamado_por_id, atualizar_status_chamado, buscar_chamados_filtrados, buscar_setores
 from app.db import conectar_bd
+from app.idempotency import gerar_token_idempotencia, validar_e_consumir_token, registrar_requisicao_duplicada
+from app.math_validation import gerar_validacao_matematica, validar_resposta_matematica, limpar_validacao_matematica, obter_numeros_sessao
 import os
 from io import BytesIO
 from app.email_service import send_email
@@ -25,12 +27,85 @@ def configure_routes(app):
     @app.route('/')
     def home():
         chamados = buscar_chamados_ativos()
-        return render_template('pages/abrir_chamado.html', chamados=chamados)
+        
+        # ===== TOKEN DE IDEMPOTÊNCIA =====
+        idempotency_token = gerar_token_idempotencia()
+        
+        # ===== VALIDAÇÃO MATEMÁTICA =====
+        # Gera dois números aleatórios e armazena na sessão
+        numero1, numero2 = gerar_validacao_matematica(session)
+        
+        return render_template(
+            'pages/abrir_chamado.html', 
+            chamados=chamados, 
+            idempotency_token=idempotency_token,
+            math_numero1=numero1,
+            math_numero2=numero2
+        )
 
     EXTENSOES_PERMITIDAS = {'.png', '.jpg', '.jpeg', '.gif', '.pdf', '.doc', '.docx'}
 
+    @app.route('/validar_resposta', methods=['POST'])
+    def validar_resposta():
+        """
+        Rota para validar resposta matemática via AJAX
+        Retorna JSON com resultado da validação
+        """
+        try:
+            data = request.get_json()
+            resposta_usuario = data.get('resposta', '').strip()
+            
+            # Valida a resposta no backend
+            validacao = validar_resposta_matematica(session, resposta_usuario)
+            
+            return jsonify({
+                'valido': validacao['valido'],
+                'mensagem': validacao['mensagem']
+            })
+        except Exception as e:
+            return jsonify({
+                'valido': False,
+                'mensagem': 'Erro ao validar resposta. Tente novamente.'
+            }), 400
+
     @app.route('/abrir_chamado', methods=['POST'])
     def abrir_chamado_route():
+        # ===== VALIDAÇÃO DE IDEMPOTÊNCIA =====
+        idempotency_token = request.form.get('idempotency_token')
+        
+        if not validar_e_consumir_token(idempotency_token):
+            nome = request.form.get('nome', 'Usuário')
+            contato = request.form.get('contato', 'N/A')
+            setor = request.form.get('setor', 'N/A')
+            registrar_requisicao_duplicada(idempotency_token, nome, contato, setor)
+            flash('Este chamado já foi enviado! Não é possível enviar o mesmo chamado novamente.', 'warning')
+            return redirect('/')
+        
+        # ===== VALIDAÇÃO MATEMÁTICA =====
+        resposta_usuario = request.form.get('math_resposta', '').strip()
+        validacao = validar_resposta_matematica(session, resposta_usuario)
+        
+        if not validacao['valido']:
+            # Validação falhou - Regenera novos números e pede tentativa novamente
+            numero1, numero2 = gerar_validacao_matematica(session)
+            idempotency_token = gerar_token_idempotencia()
+            chamados = buscar_chamados_ativos()
+            
+            flash(f'⚠️ {validacao["mensagem"]}', 'warning')
+            return render_template(
+                'pages/abrir_chamado.html',
+                chamados=chamados,
+                idempotency_token=idempotency_token,
+                math_numero1=numero1,
+                math_numero2=numero2,
+                # Mantém dados do formulário para não perder informação
+                nome=request.form.get('nome'),
+                contato=request.form.get('contato'),
+                setor=request.form.get('setor'),
+                descricao=request.form.get('descricao')
+            )
+        
+        # ===== VALIDAÇÃO PASSOU - PROCESSAR CHAMADO =====
         nome = request.form['nome']
         contato = request.form['contato']
         setor = request.form['setor']
@@ -47,13 +122,16 @@ def configure_routes(app):
             arquivo_extensao = arquivo_extensao.lower()  
 
             if arquivo_extensao not in EXTENSOES_PERMITIDAS:
-                # print('Tipo de arquivo não permitido. Envie apenas imagens, PDFs ou documentos do Word.')
                 flash('Tipo de arquivo não permitido. Envie apenas imagens, PDFs ou documentos do Word.', 'danger')
                 return redirect('/')
 
             arquivo_blob = arquivo.read()
 
         chamado_id = abrir_chamado(nome, contato, setor, descricao, arquivo_blob, arquivo_nome, arquivo_extensao, status)
+
+        # ===== LIMPA VALIDAÇÃO MATEMÁTICA DA SESSÃO =====
+        # Impede reutilização da mesma validação
+        limpar_validacao_matematica(session)
 
         subject = f"Confirmação de Abertura de Chamado N°{chamado_id}"
         message = f"""

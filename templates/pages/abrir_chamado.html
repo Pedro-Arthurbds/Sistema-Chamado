@@ -7,6 +7,10 @@
     <h2 class="titulo"><i class="bi bi-pencil-square"></i> Abertura de Chamados</h2>
 
     <form id="conteudo" method="POST" action="/abrir_chamado" enctype="multipart/form-data">
+        <!-- TOKEN DE IDEMPOTÊNCIA (OCULTO) -->
+        <!-- Este token garante que apenas um chamado será criado mesmo com múltiplos cliques -->
+        <input type="hidden" name="idempotency_token" value="{{ idempotency_token }}">
+        
         <div class="mb-3">
             <label for="nome" class="form-label fw-bold">Nome:</label>
             <input type="text" id="nome" name="nome" class="form-control" placeholder="Digite seu nome completo" required>
@@ -67,11 +71,31 @@
             <button type="button" id="clear-file" class="btn btn-primary mt-1">Limpar Anexo</button>
         </div>
 
-
-        
-        <div class="g-recaptcha" data-sitekey="6LcqJN0qAAAAAKi9YMLXIbvN8v2q_iRFMaJliTF1" data-callback="removeError"></div>
-        <div id="recaptcha-error" class="text-danger fw-bold mt-2 d-none">
-            <i class="bi bi-exclamation-circle"></i> Por favor, complete o reCAPTCHA antes de enviar.
+        <!-- VALIDAÇÃO MATEMÁTICA -->
+        <!-- Sistema de validação seguro sem reCAPTCHA -->
+        <div class="mb-3 p-3 border border-primary rounded" style="background-color: #f0f7ff;">
+            <div class="alert alert-info mb-3" role="alert">
+                <i class="bi bi-shield-check"></i> 
+                <strong>Validação de Segurança:</strong> Responda a pergunta abaixo para confirmar que você é um usuário real.
+            </div>
+            
+            <label for="math_resposta" class="form-label fw-bold">
+                🔢 Quanto é <span id="num1" style="font-weight: bold; color: #0d6efd;">{{ math_numero1 }}</span> + <span id="num2" style="font-weight: bold; color: #0d6efd;">{{ math_numero2 }}</span> ?
+            </label>
+            
+            <input type="number" 
+                   id="math_resposta" 
+                   name="math_resposta" 
+                   class="form-control" 
+                   placeholder="Informe o resultado" 
+                   min="0"
+                   required
+                   autocomplete="off">
+            
+            <small class="text-muted mt-2 d-block">
+                <i class="bi bi-info-circle"></i> 
+                Esta validação ajuda a proteger contra envios automatizados.
+            </small>
         </div>
 
         <br>
@@ -79,6 +103,15 @@
         <button type="submit" id="submit-btn" class="btn btn-primary w-100 btn-lg">
             <i class="bi bi-send"></i> Enviar Chamado
         </button>
+        
+        <!-- SPINNER DE CARREGAMENTO -->
+        <div id="loading-spinner" class="text-center mt-3 d-none">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Enviando...</span>
+            </div>
+            <p class="mt-2 text-primary fw-bold">Enviando chamado...</p>
+        </div>
+        
         <div id="success-message" class="text-center mt-3 text-success fw-bold d-none">
             <i class="bi bi-check-circle"></i> Chamado Enviado!
         </div>
