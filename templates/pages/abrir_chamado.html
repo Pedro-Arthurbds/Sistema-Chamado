@@ -3,30 +3,32 @@
 {% block title %}Abrir Chamado{% endblock %}
 
 {% block content %}
-<div class="card shadow-lg p-4">
-    <h2 class="titulo"><i class="bi bi-pencil-square"></i> Abertura de Chamados</h2>
+<div class="container py-3 px-2 px-md-4">
+    <div class="card shadow-lg p-3 p-md-4">
+        <h2 class="titulo text-center mb-4"><i class="bi bi-pencil-square"></i> Abertura de Chamados</h2>
 
-    <form id="conteudo" method="POST" action="/abrir_chamado" enctype="multipart/form-data">
+        <form id="conteudo" method="POST" action="/abrir_chamado" enctype="multipart/form-data">
         <!-- TOKEN DE IDEMPOTÊNCIA (OCULTO) -->
         <!-- Este token garante que apenas um chamado será criado mesmo com múltiplos cliques -->
         <input type="hidden" name="idempotency_token" value="{{ idempotency_token }}">
         
         <div class="mb-3">
             <label for="nome" class="form-label fw-bold">Nome:</label>
-            <input type="text" id="nome" name="nome" class="form-control" placeholder="Digite seu nome completo" required>
+            <input type="text" id="nome" name="nome" class="form-control" placeholder="Digite seu nome completo" required autocomplete="name">
         </div>
 
         <div class="mb-3">
             <label for="contato" class="form-label fw-bold">E-mail:</label>
         <input type="email" id="contato" name="contato" class="form-control"
         placeholder="E-mail" required
+        autocomplete="email"
         oninvalid="this.setCustomValidity('Por favor, insira um e-mail válido.')"
         oninput="this.setCustomValidity('')">
         </div>
 
         <div class="mb-3">
             <label for="setor" class="form-label fw-bold">Setor:</label>
-            <select id="setor" name="setor" class="form-select" required>
+            <select id="setor" name="setor" class="form-select" required autocomplete="off">
                 <option value="" disabled selected>Selecione o setor responsável</option>
                 <option value="ALMOXARIFADO">Almoxarifado e Patrimônio</option>
                 <option value="BIBLIOTECA">Biblioteca</option>
@@ -61,12 +63,12 @@
 
         <div class="mb-3">
             <label for="descricao" class="form-label fw-bold">Descrição do Problema:</label>
-            <textarea id="descricao" name="descricao" class="form-control" placeholder="Explique detalhadamente o problema" required></textarea>
+            <textarea id="descricao" name="descricao" class="form-control" placeholder="Explique detalhadamente o problema" required rows="3" style="resize:vertical;"></textarea>
         </div>
 
         <div class="mb-3">
             <label for="arquivo" class="form-label fw-bold">Anexar Arquivo:</label>
-            <input type="file" id="arquivo" name="arquivo" class="form-control">
+            <input type="file" id="arquivo" name="arquivo" class="form-control" accept=".png,.mp4,.wmv,.jpg,.jpeg,.gif,.pdf,.doc,.docx">
             <div id="file-error" class="text-danger mt-2" style="display: none;"></div>
             <button type="button" id="clear-file" class="btn btn-primary mt-1">Limpar Anexo</button>
         </div>
@@ -82,14 +84,15 @@
                 🔢 Quanto é <span id="num1" style="font-weight: bold; color: #0d6efd;">{{ math_numero1 }}</span> + <span id="num2" style="font-weight: bold; color: #0d6efd;">{{ math_numero2 }}</span> ?
             </label>
             
-            <input type="number" 
-                   id="math_resposta" 
-                   name="math_resposta" 
-                   class="form-control" 
-                   placeholder="Informe o resultado" 
-                   min="0"
-                   required
-                   autocomplete="off">
+                 <input type="number" 
+                     id="math_resposta" 
+                     name="math_resposta" 
+                     class="form-control" 
+                     placeholder="Informe o resultado" 
+                     min="0"
+                     required
+                     inputmode="numeric"
+                     autocomplete="off">
             
             <small class="text-muted mt-2 d-block">
                 <i class="bi bi-info-circle"></i> 
@@ -105,7 +108,7 @@
         
         <!-- SPINNER DE CARREGAMENTO -->
         <div id="loading-spinner" class="text-center mt-3 d-none">
-            <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <div class="spinner-border spinner-border-sm text-primary" role="status" style="width:2rem;height:2rem;">
                 <span class="visually-hidden">Enviando...</span>
             </div>
             <p class="mt-2 text-primary fw-bold">Enviando chamado...</p>
@@ -115,6 +118,8 @@
             <i class="bi bi-check-circle"></i> Chamado Enviado!
         </div>
     </form>
+        </form>
+    </div>
 </div>
 
 <!-- Alerta do chamado sendo aberto -->
@@ -128,7 +133,5 @@
         </div>
     </div>
 </div>
-
-
 
 {% endblock %}
